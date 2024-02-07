@@ -3,6 +3,7 @@ import { LowSync } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
 import { JSONFilePreset } from 'lowdb/node';
 import { JSONFileSync } from 'lowdb/node';
+import { nanoid } from 'nanoid';
 import express from 'express';
 import bodyParser from 'body-parser';
 
@@ -26,9 +27,12 @@ app.use('/css', express.static('css')); // Add this line for the CSS folder
 
 app.post('/store', (req, res) => {
   let testRes = {
+    id: nanoid(),
+    parentId: null,
     type: 'default', 
     title: '',
     description: '',
+    tool: null,
     project: null,
     category: null,
     timestamp: new Date().toISOString(),
@@ -36,6 +40,7 @@ app.post('/store', (req, res) => {
     endstamp: null,
     result: null,
     latency: {min: null, max: null, avg: null, median: null},
+    requests: {total: 0, responses: 0, ok: 0, failed: 0},
     rate: null,
     testdata: null,
     comment: '',
@@ -48,7 +53,6 @@ app.post('/store', (req, res) => {
   const name = req.query.name || 'none';
 
   const inJson = req.body; // JSON.parse(req.body);
-
   const { posts } = db.data;
 
   if(type.toLowerCase() === 'artillery') {
@@ -56,12 +60,20 @@ app.post('/store', (req, res) => {
       log('type=artillery project=' + proj);
       testRes.project = proj;
       testRes.title = name;
+      testRes.tool = 'artillery';
       testRes = parseArtilleryResults(testRes, inJson);
      
       db.update(({ posts }) => posts.push(testRes));
       db.write();
 
       log("1 insert")
+
+      /*if(Array.isArray(testRes.json)) {
+        // Insert child elements
+        Object.keys(testRes.json).forEach(function(key) {
+
+        });*/
+      //}
 
     } catch (error) {
       console.error(error);
@@ -78,6 +90,7 @@ app.post('/store', (req, res) => {
         let entry = Object.assign({}, testRes);
         entry.project = proj;
         entry.title = json.name;
+        testRes.tool = 'behave';
         entry.description = json.description;
         entry.json = json;
         entry.tags = entry.tags.concat(json.tags);
@@ -154,6 +167,7 @@ app.get('/', (req, res) => {
           <th>Result</th>
           <th>Latency</th>
           <th>Rate</th>
+          <th>Requests</th>
           <th>Duration</th>
         </tr>
       </thead>
@@ -162,9 +176,10 @@ app.get('/', (req, res) => {
                                       <td>${post.project}</td>
                                       <td>${post.category}</td>
                                       <td>${post.title}</td>
-                                      <td>${post.result}</td>
+                                      <td class="${post.result}">${post.result}</td>
                                       <td align="right">${printLatency(post)} ms</td>
                                       <td>${post.rate} rq/sec</td>
+                                      <td>${printRequests(post)}</td>
                                       <td>${new Date(new Date(post.endstamp) - new Date(post.startstamp)).getMinutes()} min</td>
                                    </tr>
                                    <tr id="${post.timestamp}" style="display:none"><td colspan="8"><pre>${JSON.stringify(post.json, null, 2)}</pre></td></tr>
@@ -199,6 +214,13 @@ function printLatency(post) {
   else {
     return '-';
   }
+}
+
+function printRequests(post) {
+  if(post.requests && post.requests.responses) {
+    return post.requests.responses + "/" + post.requests.total + " (" + Math.round(post.requests.responses / post.requests.total * 100) + "%)";
+  }
+  return "";
 }
 
 function formatNumber(latency) {

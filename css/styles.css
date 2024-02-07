@@ -37,3 +37,15 @@ table tbody tr.active-row {
     font-weight: bold;
     color: #009879;
 }
+
+.slow {
+    color: #de7878;
+}
+
+.very {
+    color: #bc3030;
+}
+
+.fast {
+    color: #009879;
+}
